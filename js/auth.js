@@ -1,16 +1,41 @@
 /* ==========================================
-   2. AUTHENTICATION MODULE (Azure AD & MSAL)
+   2. AUTHENTICATION MODULE (Azure AD & MSAL & Teams SSO)
    ========================================== */
 const AuthModule = (function() {
     
     const msalInstance = new msal.PublicClientApplication(Config.msalConfig);
 
-    // 1. تهيئة النظام بهدوء تكتيكي
+    // 1. تهيئة النظام (مع دعم الدخول الصامت داخل التيمز)
     async function initializeAuth() {
         try {
+            // التحقق مما إذا كان النظام يفتح داخل Microsoft Teams
+            if (typeof microsoftTeams !== 'undefined') {
+                try {
+                    await microsoftTeams.app.initialize();
+                    const context = await microsoftTeams.app.getContext();
+                    const userEmail = context?.user?.userPrincipalName;
+                    
+                    if (userEmail) {
+                        console.log("Teams Environment Detected. Attempting Silent SSO for:", userEmail);
+                        
+                        // محاولة الدخول الصامت باستخدام إيميل الموظف المأخوذ من التيمز مباشرة
+                        try {
+                            await msalInstance.ssoSilent({
+                                scopes: ["User.Read", "Sites.Read.All", "User.ReadBasic.All"],
+                                loginHint: userEmail
+                            });
+                        } catch (ssoError) {
+                            console.warn("Teams Silent SSO required interaction:", ssoError);
+                        }
+                    }
+                } catch (e) {
+                    console.log("Running in a standard Web Browser.");
+                }
+            }
+
             await msalInstance.handleRedirectPromise();
         } catch (error) {
-            // نتجاهل أي خطأ وهمي أثناء التهيئة بصمت تام
+            // نتجاهل أي خطأ وهمي أثناء التهيئة
         } finally {
             checkUserSession();
         }
@@ -79,22 +104,19 @@ const AuthModule = (function() {
         }
     }
 
-    // 4. تسجيل الدخول الذكي والصامت تجاه الأخطاء الوهمية
+    // 4. تسجيل الدخول اليدوي (للمتصفح العادي)
     async function authenticateUser() {
         try {
             sessionStorage.removeItem("msal.interaction.status");
-            
             await msalInstance.loginPopup({
                 scopes: ["User.Read", "Sites.Read.All", "User.ReadBasic.All"],
                 prompt: "select_account"
             });
         } catch (error) {
-            // لن نطبع أي شيء في حال كان الإلغاء من المستخدم أو خطأ تداخل وهمي
             if (error.errorCode && error.errorCode !== "user_cancelled" && error.errorCode !== "interaction_in_progress") {
                 console.warn("MSAL Popup Info:", error.errorCode);
             }
         } finally {
-            // في كل الأحوال (سواء ظهر خطأ أم لا)، نتحقق من الجلسة ونحدث الواجهة فوراً
             checkUserSession(); 
         }
     }
@@ -109,7 +131,7 @@ const AuthModule = (function() {
                 account: accounts[0]
             });
         } catch (error) {
-            // نتجاهل أي تحذير صادر عن إغلاق نافذة الخروج
+            // نتجاهل الإنذارات الكاذبة
         } finally {
             sessionStorage.clear();
             checkUserSession();
