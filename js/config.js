@@ -7,7 +7,7 @@ const Config = {
             clientId: "05bcce89-b01a-4732-857f-8402f7a649f5", 
             authority: "https://login.microsoftonline.com/58d349d2-2319-41f9-9aff-f3055d0a1880", 
             knownAuthorities: ["login.microsoftonline.com"],
-            redirectUri: "https://haider414.github.io/e-signature-portal/" 
+            redirectUri: "https://dammamvalley.github.io/E-Signature-Portal/" 
         },
         cache: {
             // استخدام الذاكرة المؤقتة يضمن تسجيل الخروج التلقائي عند إغلاق الصفحة
