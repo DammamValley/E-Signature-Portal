@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dammam Valley E-Signature</title>
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Microsoft Authentication Library (MSAL) -->
+    <script src="https://alcdn.msauth.net/browser/2.30.0/js/msal-browser.min.js"></script>
+</head>
+<body>
+
+    <!-- ==========================================
+         SIDEBAR NAVIGATION
+         ========================================== -->
+    <div class="sidebar">
+        <img src="dammam-valley.png" alt="Dammam Valley Logo" class="logo">
+        <ul class="nav-links">
+            <li class="active" onclick="NavigationModule.showSection('newRequest')">
+                <i class="fa-solid fa-paper-plane"></i> New Request
+            </li>
+            <li onclick="NavigationModule.showSection('dashboard')">
+                <i class="fa-solid fa-chart-line"></i> Dashboard
+            </li>
+            <li>
+                <i class="fa-solid fa-gear"></i> Settings
+            </li>
+        </ul>
+    </div>
+
+    <!-- ==========================================
+         MAIN CONTENT AREA
+         ========================================== -->
+    <div class="main-content">
+        
+        <!-- Header Section -->
+        <header>
+            <h1>E-Signature Portal</h1>
+            
+            <div class="user-profile" id="userProfileBtn" onclick="AuthModule.toggleProfileMenu(event)">
+                <i class="fa-solid fa-circle-user avatar-icon"></i>
+                <div class="user-info">
+                    <span class="greeting" id="profileGreeting">Welcome,</span>
+                    <span class="user-name" id="headerUserName">Not Signed In</span>
+                </div>
+                <i class="fa-solid fa-chevron-down" style="font-size: 12px; color: #888; margin-left: 8px;"></i>
+                
+                <div class="profile-menu" id="profileMenu" style="display: none;">
+                    <div class="profile-menu-header" id="profileMenuHeader" style="display: none;">
+                        <span id="menuUserName" class="menu-name"></span>
+                        <span id="menuUserEmail" class="menu-email"></span>
+                    </div>
+                    <div class="profile-menu-body">
+                        <!-- Dynamic Auth Button (Sign In / Sign Out) -->
+                        <button id="authActionButton" onclick="AuthModule.handleAuthAction()" class="btn-signin">
+                            <i class="fa-solid fa-arrow-right-to-bracket"></i> Sign In
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- SECTION 1: Create New Request -->
+        <section id="newRequestSection" class="card new-request-card">
+            <h2><i class="fa-solid fa-file-signature"></i> Create New Request</h2>
+            
+            <form id="signatureForm">
+                
+                <div class="form-group">
+                    <label>Recipient(s) (Name & Email)</label>
+                    <div class="chips-container" id="recipientChipsContainer" onclick="document.getElementById('recipientSearch').focus()">
+                        <input type="text" id="recipientSearch" placeholder="Type name or email to search..." autocomplete="off">
+                    </div>
+                    <div id="searchResultsDropdown" class="dropdown-content" style="display: none;"></div>
+                    <input type="hidden" id="finalRecipients" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="section-label">Upload Document(s) (PDF, Word) <span style="font-size:11px; color:#888;">(Max 10MB per file)</span></label>
+                    <div class="file-upload-box" onclick="document.getElementById('document').click()">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <input type="file" id="document" accept=".pdf, .doc, .docx" multiple style="display:none;">
+                        <p id="fileNameDisplay">Drag and drop your files here, or click to browse</p>
+                    </div>
+                    <div id="uploadedFilesContainer" class="uploaded-files-list"></div>
+                </div>
+
+                <input type="hidden" id="senderName" value="">
+                <input type="hidden" id="senderEmail" value="">
+                
+                <button type="button" class="btn-primary" onclick="SubmissionModule.openOptionsModal()">
+                    Continue <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </form>
+
+            <div style="margin-top: 40px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                <h3 style="font-size: 15px; color: var(--dv-dark-blue); margin-bottom: 12px;">
+                    <i class="fa-solid fa-clock-rotate-left"></i> Recent Activity Overview
+                </h3>
+                <!-- Container for Recent Activity Table -->
+                <div id="recentActivityContainer">
+                    <p style="font-size: 13px; color: var(--text-muted);">Loading recent activity...</p>
+                </div>
+                <p style="font-size: 13px; color: var(--text-muted); margin-top: 10px;">You can check your full request tracking and statuses anytime under the <a href="javascript:void(0)" onclick="NavigationModule.showSection('dashboard')" style="color: var(--dv-teal); font-weight: bold; text-decoration: none;">Dashboard</a> tab.</p>
+            </div>
+        </section>
+
+        <!-- SECTION 2: Dashboard -->
+        <section id="dashboardSection" class="card dashboard-card" style="display: none;">
+            
+            <h2><i class="fa-solid fa-paper-plane"></i> Sent Requests</h2>
+            <table class="requests-table">
+                <thead>
+                    <tr>
+                        <th>Recipient Name</th>
+                        <th>Document</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="sentRequestsBody"></tbody>
+            </table>
+
+            <h2 style="margin-top: 40px;"><i class="fa-solid fa-inbox"></i> Received Requests</h2>
+            <table class="requests-table">
+                <thead>
+                    <tr>
+                        <th>Sender Name</th>
+                        <th>Document</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="receivedRequestsBody"></tbody>
+            </table>
+        </section>
+
+    </div>
+
+    <!-- ==========================================
+         MODALS
+         ========================================== -->
+    
+    <!-- Details Modal -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="DashboardModule.closeModal()">&times;</span>
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-file-contract"></i> Signature Request Details</h2>
+                <span id="modalStatusBadge" class="status">Loading...</span>
+            </div>
+            
+            <div class="modal-body">
+                <div class="details-grid">
+                    <div class="detail-box">
+                        <h3><i class="fa-solid fa-paper-plane"></i> Sender Info</h3>
+                        <p><strong>Name:</strong> <span id="modalSenderName"></span></p>
+                        <p><strong>Email:</strong> <span id="modalSenderEmail"></span></p>
+                    </div>
+                    <div class="detail-box">
+                        <h3><i class="fa-solid fa-user-pen"></i> Recipient Info</h3>
+                        <p><strong>Name:</strong> <span id="modalRecipientName"></span></p>
+                        <p><strong>Email:</strong> <span id="modalRecipientEmail"></span></p>
+                    </div>
+                </div>
+
+                <div class="document-info-box">
+                    <h3><i class="fa-solid fa-file-pdf"></i> Document Information</h3>
+                    <p><strong>File Name:</strong> <span id="modalFileName"></span></p>
+                    <p><strong>Order ID:</strong> <span id="modalOrderId"></span></p>
+                    <p><strong>Date Created:</strong> <span id="modalDate"></span></p>
+                </div>
+                
+                <div class="modal-actions">
+                    <button class="btn-primary" id="btnViewDocument" style="width: auto;">
+                        <i class="fa-solid fa-eye"></i> View Document
+                    </button>
+                    <button class="btn-secondary" id="btnSendReminder" style="width: auto;">
+                        <i class="fa-solid fa-bell"></i> Send Reminder
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sending Options Modal (No Exclamation Marks, Clean Text Descriptions) -->
+    <div id="sendOptionsModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close" onclick="SubmissionModule.closeOptionsModal()">&times;</span>
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-sliders"></i> Sending Options</h2>
+            </div>
+            
+            <div class="modal-body">
+                <div class="summary-section" style="margin-bottom: 20px;">
+                    <h3 style="font-size: 14px; color: var(--dv-dark-blue); border-bottom: 1px dashed var(--border-color); padding-bottom: 8px; margin-bottom: 10px;">
+                        <i class="fa-solid fa-file-pdf"></i> Selected Files
+                    </h3>
+                    <ul id="summaryFilesList" style="list-style: none; padding-left: 0; font-size: 13px; color: var(--text-muted);"></ul>
+                </div>
+
+                <div class="summary-section" style="margin-bottom: 25px;">
+                    <h3 style="font-size: 14px; color: var(--dv-dark-blue); border-bottom: 1px dashed var(--border-color); padding-bottom: 8px; margin-bottom: 10px;">
+                        <i class="fa-solid fa-users"></i> Recipients Order 
+                        <span style="font-size: 11px; font-weight: normal; color: #888;">(Use arrows to reorder)</span>
+                    </h3>
+                    <ul id="summaryRecipientsList" class="reorder-list"></ul>
+                </div>
+
+                <!-- Routing Options Section (No Exclamation Marks) -->
+                <div class="routing-options" style="background: #f8fcfb; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px;">
+                    <label style="font-weight: bold; color: var(--dv-dark-blue); display: block; margin-bottom: 5px;">
+                        Routing Type:
+                    </label>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Choose how recipients will receive and sign the document workflow.</p>
+                    
+                    <div style="display: flex; gap: 20px; align-items: center;">
+                        <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;" id="groupLabel">
+                            <input type="radio" name="modalRouting" value="sequential" id="routeGroup" checked> Group <span style="font-size: 11px; color: #777;">(Sequential signing order)</span>
+                        </label>
+                        <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;" id="individualLabel">
+                            <input type="radio" name="modalRouting" value="parallel" id="routeIndividual"> Individual <span style="font-size: 11px; color: #777;">(Simultaneous signing)</span>
+                        </label>
+                    </div>
+                    <!-- Amber Warning Notice for single recipient -->
+                    <p id="singleRecipientNotice" style="display: none; font-size: 12px; color: #b45309; background-color: #fef3c7; border: 1px solid #f59e0b; padding: 8px 12px; border-radius: 6px; margin-top: 10px; margin-bottom: 0; font-weight: 500;">
+                        Routing is automatically locked to 'Individual' because only one recipient is selected.
+                    </p>
+                </div>
+
+                <!-- Signature Placement Section -->
+                <div class="placement-options" style="background: #f8fcfb; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 25px;">
+                    <label style="font-weight: bold; color: var(--dv-dark-blue); display: block; margin-bottom: 5px;">
+                        Signature Placement:
+                    </label>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Select how signature fields will be positioned on the document.</p>
+                    
+                    <div class="modal-actions" style="display: flex; gap: 15px; justify-content: space-between; border-top: none; padding-top: 0; margin-top: 0;">
+                        <button class="btn-secondary" style="flex: 1; text-align: center; justify-content: center;" onclick="SubmissionModule.submitFinalRequest('manual')" title="Manual Placement">
+                            <i class="fa-solid fa-pen-nib"></i> Manual Placement
+                        </button>
+                        <button class="btn-primary" style="flex: 1; text-align: center; justify-content: center;" onclick="SubmissionModule.submitFinalRequest('auto')" title="Auto Placement">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Auto Placement
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Files -->
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/navigation.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/recipients.js"></script>
+    <script src="js/files.js"></script>
+    <script src="js/submission.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
