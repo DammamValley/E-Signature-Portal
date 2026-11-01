@@ -5,6 +5,13 @@ const SubmissionModule = (function() {
 
     // 1. Open options modal and review files & recipients
     function openOptionsModal() {
+        // طبقة حماية ثانية تمنع إكمال الطلب إذا لم يكن هناك حساب مسجل
+        const accounts = AuthModule.msalInstance.getAllAccounts();
+        if (accounts.length === 0) {
+            alert("Security Error: Please sign in first to complete your request.");
+            return;
+        }
+
         const documentFiles = FilesModule.getFiles();
         const recipients = RecipientsModule.getSelectedRecipients();
         

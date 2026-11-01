@@ -50,6 +50,9 @@ const AuthModule = (function() {
         const userNameEl = document.getElementById('headerUserName');
         const menuUserName = document.getElementById('menuUserName');
         const menuUserEmail = document.getElementById('menuUserEmail');
+        
+        // --- التحديث الجديد: التحكم بزر الإرسال ---
+        const btnContinue = document.getElementById('btnContinue');
 
         if (accounts.length > 0) {
             const user = accounts[0];
@@ -71,6 +74,9 @@ const AuthModule = (function() {
             const senderEmailInput = document.getElementById('senderEmail');
             if (senderNameInput) senderNameInput.value = currentUserName;
             if (senderEmailInput) senderEmailInput.value = currentUserEmail;
+            
+            // تفعيل الزر لأن المستخدم مسجل الدخول
+            if (btnContinue) btnContinue.disabled = false;
 
             if (typeof DashboardModule !== 'undefined') {
                 DashboardModule.loadDashboardData();
@@ -86,6 +92,9 @@ const AuthModule = (function() {
                 authBtn.className = 'btn-signin';
                 authBtn.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Sign In';
             }
+            
+            // تعطيل الزر لأن المستخدم غير مسجل الدخول
+            if (btnContinue) btnContinue.disabled = true;
             
             const recentContainer = document.getElementById('recentActivityContainer');
             if(recentContainer) {
