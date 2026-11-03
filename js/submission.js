@@ -135,6 +135,9 @@ const SubmissionModule = (function() {
         const modalContent = document.querySelector('#sendOptionsModal .modal-content');
         const originalContent = modalContent ? modalContent.innerHTML : '';
         
+        // متغير جديد لحماية شاشة النجاح من المسح
+        let isManualSuccess = false; 
+
         if (modalContent) {
             // Keep loading screen active until Power Automate responds
             modalContent.innerHTML = '<div style="text-align:center; padding: 40px;"><h2><i class="fa-solid fa-spinner fa-spin" style="color:var(--dv-teal);"></i> Processing Request...</h2><p>Please wait while we connect to Power Automate and Adobe Sign. Do not close this window.</p></div>';
@@ -169,31 +172,52 @@ const SubmissionModule = (function() {
                 // Parse JSON response from Power Automate
                 const responseData = await response.json();
                 
-                // 2. Handle Manual Links Automation
+                // 2. Handle Manual Links Automation (THE FIX)
                 if (placementType === 'Manual' && responseData && responseData.urls) {
-                    alert("Request processed successfully! Opening Adobe Sign windows...");
+                    // تفعيل الحماية لكي لا يتم مسح الشاشة
+                    isManualSuccess = true; 
                     
-                    // Loop through the URLs array and open each in a new tab
-                    responseData.urls.forEach(url => {
-                        if (url) window.open(url, '_blank');
+                    let linksHtml = '';
+                    responseData.urls.forEach((url, index) => {
+                        if (url) {
+                            linksHtml += `<a href="${url}" target="_blank" class="btn-primary" style="display:inline-block; margin-top:15px; margin-bottom:10px; text-decoration:none; text-align:center;">
+                                <i class="fa-solid fa-pen-nib"></i> Open Document ${index + 1} for Placement
+                            </a><br>`;
+                        }
                     });
+
+                    // عرض شاشة النجاح مع أزرار الروابط
+                    if (modalContent) {
+                        modalContent.innerHTML = `
+                            <div style="text-align:center; padding: 40px;">
+                                <i class="fa-solid fa-circle-check" style="color:#00A896; font-size: 50px; margin-bottom:20px;"></i>
+                                <h2 style="color:var(--dv-dark-blue); margin-bottom: 10px;">Ready for Placement</h2>
+                                <p style="color:var(--text-muted); margin-bottom: 20px;">Your document is successfully generated. Please click the button below to manually place the signature fields in Adobe Sign.</p>
+                                ${linksHtml}
+                                <br><br>
+                                <button class="btn-secondary" style="margin-top: 20px;" onclick="window.location.reload();">Close & Refresh</button>
+                            </div>
+                        `;
+                    }
                 } else {
+                    // مسار التحديد التلقائي يعمل كما كان
                     alert("Request sent successfully! Your auto-workflow has been triggered.");
+                    
+                    // 3. Reset form and states
+                    const form = document.getElementById('signatureForm');
+                    if (form) form.reset();
+                    RecipientsModule.clearRecipients();
+                    FilesModule.clearFiles();
+                    
+                    const fileNameDisplay = document.getElementById('fileNameDisplay');
+                    if (fileNameDisplay) {
+                        fileNameDisplay.innerHTML = 'Drag and drop your files here, or click to browse';
+                        fileNameDisplay.style.display = 'block';
+                    }
+                    
+                    closeOptionsModal();
                 }
-                
-                // 3. Reset form and states
-                const form = document.getElementById('signatureForm');
-                if (form) form.reset();
-                RecipientsModule.clearRecipients();
-                FilesModule.clearFiles();
-                
-                const fileNameDisplay = document.getElementById('fileNameDisplay');
-                if (fileNameDisplay) {
-                    fileNameDisplay.innerHTML = 'Drag and drop your files here, or click to browse';
-                    fileNameDisplay.style.display = 'block';
-                }
-                
-                closeOptionsModal();
+
             } else {
                 throw new Error("Server Response Error");
             }
@@ -202,8 +226,8 @@ const SubmissionModule = (function() {
             console.error("Submission Error:", error);
             alert("An error occurred while sending the request. Please check your connection.");
         } finally {
-            if (modalContent) {
-                // Restore original modal content for the next request
+            // إعادة الشاشة لحالتها الأصلية فقط إذا لم نكن في شاشة النجاح اليدوية
+            if (modalContent && !isManualSuccess) {
                 modalContent.innerHTML = originalContent;
             }
         }
