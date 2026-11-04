@@ -404,20 +404,6 @@ label {
     color: #1e293b;
 }
 
-.btn-view {
-    background: none;
-    border: 1px solid var(--dv-teal);
-    color: var(--dv-teal);
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.btn-view:hover {
-    background: var(--dv-teal);
-    color: white;
-}
-
 /* ==========================================
    7. TABLES & UNIFORM ALIGNED COLUMNS
    ========================================== */
@@ -431,42 +417,52 @@ label {
     padding: 15px;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
-    word-break: break-word;
+    /* إزالة word-break: break-word لمنع تكدس النصوص الطويلة */
 }
 
 /* Strict Column Width Proportions */
-.requests-table th:nth-child(1), .requests-table td:nth-child(1) { width: 25%; }
-.requests-table th:nth-child(2), .requests-table td:nth-child(2) { width: 35%; }
+.requests-table th:nth-child(1), .requests-table td:nth-child(1) { width: 20%; }
+.requests-table th:nth-child(2), .requests-table td:nth-child(2) { 
+    width: 40%; /* إعطاء مساحة أكبر لاسم الملف */
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; /* إضافة النقاط الثلاث للملفات الطويلة */
+}
 .requests-table th:nth-child(3), .requests-table td:nth-child(3) { width: 15%; }
 .requests-table th:nth-child(4), .requests-table td:nth-child(4) { width: 15%; }
-.requests-table th:nth-child(5), .requests-table td:nth-child(5) { width: 10%; text-align: center; }
+.requests-table th:nth-child(5), .requests-table td:nth-child(5) { 
+    width: 10%; 
+    text-align: center; 
+}
 
 .status {
     padding: 5px 12px;
     border-radius: 20px;
     font-size: 13px;
     font-weight: bold;
+    display: inline-block;
 }
 
-.status.pending { 
-    background: #e0f0ff; 
-    color: #0056b3; 
+.status.pending { background: #e0f0ff; color: #0056b3; }
+.status.signed { background: #d4edda; color: #155724; }
+.status.declined { background: #fee2e2; color: #b91c1c; }
+.status.cancelled { background: #fde8e8; color: #991b1b; }
+
+/* تحسين زر التفاصيل لمنع انقسامه */
+.btn-view {
+    background: none;
+    border: 1px solid var(--dv-teal);
+    color: var(--dv-teal);
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap; /* يمنع انقسام الكلمة على سطرين */
+    font-size: 13px;
 }
 
-.status.signed { 
-    background: #d4edda; 
-    color: #155724; 
-}
-
-.status.declined {
-    background: #fee2e2;
-    color: #b91c1c;
-}
-
-/* Added Cancelled status styling */
-.status.cancelled {
-    background: #fde8e8; /* Light red background */
-    color: #991b1b;     /* Dark red text */
+.btn-view:hover {
+    background: var(--dv-teal);
+    color: white;
 }
 
 /* ==========================================
