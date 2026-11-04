@@ -63,6 +63,7 @@ const DashboardModule = (function() {
                 const fields = item.fields;
                 const request = {
                     id: fields.OrderNumber || fields.AgreementID || fields.OData__x004f_rderNumber || "N/A", 
+                    adobeAgreementId: fields.AgreementID || fields.Agreement_x0020_ID || "N/A",
                     senderName: fields.SenderName || fields.Sender_x0020_Name || "N/A",
                     senderEmail: fields.SenderEmail || fields.Sender_x0020_Email || "N/A",
                     recipientName: fields.RecipientName || fields.Recipient_x0020_Name || fields.RecipientEmail || "N/A",
@@ -211,7 +212,7 @@ const DashboardModule = (function() {
                 try {
                     const payload = {
                         actionType: "remind",
-                        agreementId: request.id,
+                        agreementId: request.adobeAgreementId,
                         userEmail: currentUserEmail
                     };
 
@@ -270,7 +271,7 @@ const DashboardModule = (function() {
             document.querySelector('.modal-actions').prepend(btnSignNow);
         }
 
-        // تنظيف خصائص الزر السابقة لضمان عدم تداخل الحالات بين الطلبات
+        // تنظيف خصائص الزر لضمان عدم تداخل الحالات بين الطلبات
         btnSignNow.disabled = false;
         btnSignNow.style.backgroundColor = '';
         btnSignNow.style.color = '';
@@ -278,14 +279,15 @@ const DashboardModule = (function() {
         btnSignNow.style.border = '';
         btnSignNow.onclick = null;
 
-        if (request.status === 'Pending') {
+        // الشرط الجديد: الحالة "قيد الانتظار" + المستخدم يعرض الطلب بصفته "مُستلماً" (من جدول Received)
+        if (request.status === 'Pending' && request.displayType === 'received') {
             btnSignNow.style.display = 'block';
 
-            // التحقق: هل الموظف الحالي هو المطلوب للتوقيع؟
+            // التحقق: هل إيميل الموظف يطابق الإيميل المطلوب توقيعه الآن في شيربوينت؟
             const isMyTurn = request.currentSignerEmail && request.currentSignerEmail.toLowerCase().includes(currentUserEmail.toLowerCase());
 
             if (isMyTurn) {
-                // حالة 1: دور الموظف الحالي
+                // حالة 1: دور الموظف الحالي (يظهر زر التوقيع الأزرق)
                 btnSignNow.innerHTML = '✍️ Sign Now';
                 
                 btnSignNow.onclick = async function() {
@@ -299,7 +301,7 @@ const DashboardModule = (function() {
                     try {
                         const payload = {
                             actionType: "sign",
-                            agreementId: request.id,
+                            agreementId: request.adobeAgreementId,
                             userEmail: currentUserEmail
                         };
 
@@ -327,22 +329,21 @@ const DashboardModule = (function() {
                         newTab.close();
                         alert("Error loading the signature page.");
                     } finally {
-                        // إعادة الزر لشكله الطبيعي
                         btnSignNow.innerHTML = originalHtml;
                         btnSignNow.disabled = false;
                     }
                 };
             } else {
-                // حالة 2: قيد الانتظار، ولكن ليس دور الموظف الحالي
+                // حالة 2: قيد الانتظار، ولكن ليس دور الموظف الحالي (زر رمادي معطل)
                 btnSignNow.innerHTML = '⏳ Waiting for others';
                 btnSignNow.disabled = true;
-                btnSignNow.style.backgroundColor = '#f1f5f9'; // رمادي باهت
-                btnSignNow.style.color = '#64748b'; // نص رمادي غامق
+                btnSignNow.style.backgroundColor = '#f1f5f9';
+                btnSignNow.style.color = '#64748b';
                 btnSignNow.style.cursor = 'not-allowed';
                 btnSignNow.style.border = '1px solid #cbd5e1';
             }
         } else {
-            // حالة 3: إذا كان الطلب مكتمل أو ملغي، نخفي الزر تماماً
+            // حالة 3: إذا كان الطلب مُرسلاً (Sent)، أو مكتملاً/ملغياً، نخفي الزر تماماً
             btnSignNow.style.display = 'none';
         }
         
