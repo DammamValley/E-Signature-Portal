@@ -57,7 +57,6 @@ const DashboardModule = (function() {
             let sentCount = 0;
             let receivedCount = 0;
             
-            // Array to hold recent activity for rendering later
             let recentActivityList = [];
 
             items.forEach((item) => {
@@ -70,46 +69,48 @@ const DashboardModule = (function() {
                     recipientEmail: fields.RecipientEmail || fields.Recipient_x0020_Email || "N/A",
                     fileName: fields.Title || "N/A", 
                     date: new Date(item.createdDateTime).toLocaleDateString(),
-                    status: fields.RequestStatus || fields.Request_x0020_Status || "Pending" 
+                    status: fields.RequestStatus || fields.Request_x0020_Status || "Pending",
+                    // --- إضافة جلب حقل CurrentSignerEmail ---
+                    currentSignerEmail: fields.CurrentSignerEmail || null
                 };
-
-                realRequests.push(request);
-                const currentIndex = realRequests.length - 1;
 
                 let statusClass = 'pending';
                 if (request.status === 'Completed' || request.status === 'Signed') statusClass = 'signed';
                 if (request.status === 'Declined') statusClass = 'declined';
-                if (request.status === 'Cancelled') statusClass = 'cancelled'; // Added Cancelled logic
+                if (request.status === 'Cancelled') statusClass = 'cancelled'; 
                 
-                let tr = document.createElement('tr');
-                
-                // Uniform column layout: [Target Name / Sender] [Document] [Date] [Status] [Details]
+                // --- إصلاح مشكلة الإرسال للنفس ---
                 if (request.senderEmail === currentUserEmail) {
+                    realRequests.push({...request, displayType: 'sent'});
+                    const currentIndex = realRequests.length - 1;
                     sentCount++;
+                    
+                    let tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>${request.recipientName}</td>
-                        <td>${request.fileName}</td>
+                        <td title="${request.fileName}">${request.fileName}</td>
                         <td>${request.date}</td>
                         <td><span class="status ${statusClass}">${request.status}</span></td>
-                        <td><button class="btn-view" onclick="DashboardModule.openDynamicModal(${currentIndex})">View Details</button></td>
+                        <td><button class="btn-view" onclick="DashboardModule.openDynamicModal(${currentIndex})"><i class="fa-solid fa-eye"></i> View</button></td>
                     `;
                     sentBody.appendChild(tr);
-                    
-                    // Add to recent activity if relevant
                     recentActivityList.push({ type: 'Sent', data: request, index: currentIndex, statusClass: statusClass });
                 } 
-                else if (request.recipientEmail === currentUserEmail) {
+                
+                if (request.recipientEmail === currentUserEmail) {
+                    realRequests.push({...request, displayType: 'received'});
+                    const currentIndex = realRequests.length - 1;
                     receivedCount++;
+                    
+                    let tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>${request.senderName}</td>
-                        <td>${request.fileName}</td>
+                        <td title="${request.fileName}">${request.fileName}</td>
                         <td>${request.date}</td>
                         <td><span class="status ${statusClass}">${request.status}</span></td>
-                        <td><button class="btn-view" onclick="DashboardModule.openDynamicModal(${currentIndex})">View Details</button></td>
+                        <td><button class="btn-view" onclick="DashboardModule.openDynamicModal(${currentIndex})"><i class="fa-solid fa-eye"></i> View</button></td>
                     `;
                     receivedBody.appendChild(tr);
-                    
-                     // Add to recent activity if relevant
                     recentActivityList.push({ type: 'Received', data: request, index: currentIndex, statusClass: statusClass });
                 }
             });
@@ -117,7 +118,6 @@ const DashboardModule = (function() {
             if (sentCount === 0) sentBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No sent requests found</td></tr>';
             if (receivedCount === 0) receivedBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No received requests found</td></tr>';
             
-            // Render Recent Activity (Top 3)
             renderRecentActivity(recentActivityList, recentContainer);
             
         } catch (error) {
@@ -128,7 +128,6 @@ const DashboardModule = (function() {
         }
     }
     
-    // Function to render the top 3 recent activities in the New Request page
     function renderRecentActivity(activityList, container) {
         if (!container) return;
         
@@ -137,7 +136,6 @@ const DashboardModule = (function() {
             return;
         }
 
-        // Take only the first 3 items (they are already sorted by date)
         const recentItems = activityList.slice(0, 3);
         
         let tableHTML = `
@@ -161,7 +159,7 @@ const DashboardModule = (function() {
                 <tr>
                     <td style="padding: 10px;">${typeIcon}</td>
                     <td style="padding: 10px;">${contactName}</td>
-                    <td style="padding: 10px;">${item.data.fileName}</td>
+                    <td style="padding: 10px;" title="${item.data.fileName}">${item.data.fileName}</td>
                     <td style="padding: 10px;"><span class="status ${item.statusClass}" style="font-size: 11px; padding: 3px 8px;">${item.data.status}</span></td>
                 </tr>
             `;
@@ -171,7 +169,6 @@ const DashboardModule = (function() {
         container.innerHTML = tableHTML;
     }
 
-    // Open details modal for a specific request
     function openDynamicModal(index) {
         const request = realRequests[index];
         if (!request) return;
@@ -199,27 +196,155 @@ const DashboardModule = (function() {
             statusBadge.className = 'status pending';
         }
         
+        // --- 1. برمجة زر التذكير ---
         const btnReminder = document.getElementById('btnSendReminder');
+        
         if (request.status === 'Pending' && request.senderEmail === currentUserEmail) {
-            btnReminder.style.display = 'block'; 
+            btnReminder.style.display = 'block';
+            
+            btnReminder.onclick = async function() {
+                const originalHtml = btnReminder.innerHTML;
+                btnReminder.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+                btnReminder.disabled = true;
+                btnReminder.style.opacity = '0.7';
+
+                try {
+                    const payload = {
+                        actionType: "remind",
+                        agreementId: request.id,
+                        userEmail: currentUserEmail
+                    };
+
+                    const response = await fetch(Config.masterFlowWebhookUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        btnReminder.innerHTML = '<i class="fa-solid fa-check"></i> Reminder Sent';
+                        btnReminder.style.backgroundColor = '#d4edda';
+                        btnReminder.style.color = '#155724';
+                        btnReminder.style.borderColor = '#c3e6cb';
+                    } else {
+                        throw new Error("Failed to send reminder");
+                    }
+                } catch (error) {
+                    console.error("Reminder Error:", error);
+                    btnReminder.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Error';
+                    btnReminder.style.backgroundColor = '#fee2e2';
+                    btnReminder.style.color = '#b91c1c';
+                    alert("Failed to send reminder. Please check your connection or Webhook URL.");
+                } finally {
+                    setTimeout(() => {
+                        btnReminder.innerHTML = originalHtml;
+                        btnReminder.disabled = false;
+                        btnReminder.style.opacity = '1';
+                        btnReminder.style.backgroundColor = '';
+                        btnReminder.style.color = '';
+                        btnReminder.style.borderColor = '';
+                    }, 3000);
+                }
+            };
         } else {
             btnReminder.style.display = 'none';  
         }
 
+        // --- 2. برمجة زر العرض (View Document) ---
         const btnView = document.getElementById('btnViewDocument');
         btnView.onclick = function() {
-            // جلب الهوست (مثال: dammamvalleyd.sharepoint.com)
             const siteHostname = Config.sharePointContext.siteHostname;
-            // مسار الموقع (مثال: E-SignatureSystem) - نقوم بإزالة أي /sites/ قد تكون مضافة بالخطأ في الإعدادات
             let sitePath = Config.sharePointContext.sitePath.replace('/sites/', '');
-            
             const archiveLibraryName = "SignedContractsArchive"; 
-            
-            // بناء الرابط النظيف
             const fileUrl = `https://${siteHostname}/sites/${sitePath}/${archiveLibraryName}/${encodeURIComponent(request.fileName)}?web=1`;
-            
             window.open(fileUrl, '_blank');
         };
+
+        // --- 3. إنشاء وبرمجة زر التوقيع الذكي (Sign Now) ---
+        let btnSignNow = document.getElementById('btnSignNow');
+        if (!btnSignNow) {
+            btnSignNow = document.createElement('button');
+            btnSignNow.id = 'btnSignNow';
+            btnSignNow.className = 'btn-primary';
+            btnSignNow.style.width = 'auto';
+            document.querySelector('.modal-actions').prepend(btnSignNow);
+        }
+
+        // تنظيف خصائص الزر السابقة لضمان عدم تداخل الحالات بين الطلبات
+        btnSignNow.disabled = false;
+        btnSignNow.style.backgroundColor = '';
+        btnSignNow.style.color = '';
+        btnSignNow.style.cursor = 'pointer';
+        btnSignNow.style.border = '';
+        btnSignNow.onclick = null;
+
+        if (request.status === 'Pending') {
+            btnSignNow.style.display = 'block';
+
+            // التحقق: هل الموظف الحالي هو المطلوب للتوقيع؟
+            const isMyTurn = request.currentSignerEmail && request.currentSignerEmail.toLowerCase().includes(currentUserEmail.toLowerCase());
+
+            if (isMyTurn) {
+                // حالة 1: دور الموظف الحالي
+                btnSignNow.innerHTML = '✍️ Sign Now';
+                
+                btnSignNow.onclick = async function() {
+                    // 💡 خدعة تجاوز مانع النوافذ المنبثقة: نفتح نافذة فارغة فور الضغط
+                    const newTab = window.open('about:blank', '_blank');
+
+                    const originalHtml = btnSignNow.innerHTML;
+                    btnSignNow.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading...';
+                    btnSignNow.disabled = true;
+
+                    try {
+                        const payload = {
+                            actionType: "sign",
+                            agreementId: request.id,
+                            userEmail: currentUserEmail
+                        };
+
+                        const response = await fetch(Config.masterFlowWebhookUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (response.ok) {
+                            const responseData = await response.json();
+                            if (responseData.url) {
+                                // توجيه النافذة الفارغة إلى رابط أدوبي
+                                newTab.location.href = responseData.url; 
+                            } else {
+                                newTab.close(); // إغلاق النافذة إذا فشل جلب الرابط
+                                alert("Could not retrieve the signing URL.");
+                            }
+                        } else {
+                            newTab.close();
+                            throw new Error("Failed to get signing URL");
+                        }
+                    } catch (error) {
+                        console.error("Sign Now Error:", error);
+                        newTab.close();
+                        alert("Error loading the signature page.");
+                    } finally {
+                        // إعادة الزر لشكله الطبيعي
+                        btnSignNow.innerHTML = originalHtml;
+                        btnSignNow.disabled = false;
+                    }
+                };
+            } else {
+                // حالة 2: قيد الانتظار، ولكن ليس دور الموظف الحالي
+                btnSignNow.innerHTML = '⏳ Waiting for others';
+                btnSignNow.disabled = true;
+                btnSignNow.style.backgroundColor = '#f1f5f9'; // رمادي باهت
+                btnSignNow.style.color = '#64748b'; // نص رمادي غامق
+                btnSignNow.style.cursor = 'not-allowed';
+                btnSignNow.style.border = '1px solid #cbd5e1';
+            }
+        } else {
+            // حالة 3: إذا كان الطلب مكتمل أو ملغي، نخفي الزر تماماً
+            btnSignNow.style.display = 'none';
+        }
         
         document.getElementById('detailsModal').style.display = 'block';
     }
